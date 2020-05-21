@@ -38,6 +38,12 @@ def get_loader(data_dir ='/volume3/AAM-GAN/data/RaFD', mode = 'train'):
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
+        
+        'infer': transforms.Compose([
+            transforms.Resize(128),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
     }
     
     
@@ -54,7 +60,7 @@ def get_loader(data_dir ='/volume3/AAM-GAN/data/RaFD', mode = 'train'):
     
     else : 
     
-        test_image_datasets = datasets.ImageFolder( data_dir,data_transforms['val'])
+        test_image_datasets = datasets.ImageFolder( data_dir,data_transforms['infer'])
         dataloaders = torch.utils.data.DataLoader(test_image_datasets, batch_size = 4, shuffle= False, num_workers = 4)
         dataset_sizes = len(test_image_datasets)
         class_names = test_image_datasets.classes
@@ -248,6 +254,6 @@ def cls_err(data_dir='/volume3/AAM-GAN/stargan_rafd/results/output'):
 # train()
 
 #find the classification err and accuracy
-cls_err()
+cls_err('/volume3/AAM-GAN/stargan_rafd/results/output')
 
     
