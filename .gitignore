@@ -1,3 +1,23 @@
+# directories
+AAM_GAN_32_0.1_1
+AAM_GAN_32_0.3_1
+AAM_GAN_32_0.5_1
+AAM_GAN_32_0.7_1
+AAM_GAN_64_0.1_1
+AAM_GAN_64_0.3_1
+AAM_GAN_64_0.5_1
+AAM_GAN_64_0.7_1
+AAM_GAN_128_0.1_1
+AAM_GAN_128_0.3_1
+AAM_GAN_128_0.5_1
+AAM_GAN_128_0.7_1
+face_classifier_train_GAN.pth
+face_classifier_retrained.pth
+face_classifier_face_aligned.pth
+AAM_GAN_train_log_dir
+baseline_train
+face_aligned_log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

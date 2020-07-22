@@ -1,5 +1,5 @@
 from __future__ import print_function, division
-
+import cv2
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,41 +11,76 @@ from torch.backends import cudnn
 import matplotlib.pyplot as plt
 import time
 import os
+from random import random
 import copy
 from  utils import imsave
+from logger import Logger
+import argparse
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # For fast training.
 cudnn.benchmark = True
 
 
-def get_loader(data_dir ='/volume3/AAM-GAN/data/RaFD', mode = 'train'):
+
+def get_loader(data_dir, eval_type='gan_train', mode = 'train'):
 
     # Data augmentation and normalization for training
     # Just normalization for validation
-    data_transforms = {
-        'train': transforms.Compose([
-            transforms.CenterCrop(680),
-            transforms.Resize(128),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]),
-        'val': transforms.Compose([
-            transforms.CenterCrop(680),
-            transforms.Resize(128),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]),
-        
-        'infer': transforms.Compose([
-            transforms.Resize(128),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
-    }
     
+    if eval_type == 'gan_train':
+        
+        data_transforms = {
+            'train': transforms.Compose([
+                #transforms.CenterCrop(680),
+                transforms.Resize(128),         
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+            'val': transforms.Compose([
+                #transforms.CenterCrop(680),
+                transforms.Resize(128),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+            
+            'infer': transforms.Compose([
+                transforms.CenterCrop(680),
+                transforms.Resize(128),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        }
+        
+    if eval_type == 'gan_test':
+    
+        data_transforms = {
+            'train': transforms.Compose([
+                transforms.CenterCrop(680),
+                transforms.Resize(128),         
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+            'val': transforms.Compose([
+                transforms.CenterCrop(680),
+                transforms.Resize(128),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+            
+            'infer': transforms.Compose([
+                #transforms.CenterCrop(680),
+                transforms.Resize(128),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        }
+        
+        
     
     
     if mode == 'train':
@@ -68,8 +103,7 @@ def get_loader(data_dir ='/volume3/AAM-GAN/data/RaFD', mode = 'train'):
     return dataloaders, class_names, dataset_sizes
     
 
-def visualize_save_image(data_dir = '/volume3/AAM-GAN/data/RaFD' ):
-
+def visualize_save_image(data_dir):
 
     ######### visualize the images in grid ##########
     
@@ -90,11 +124,12 @@ def model():
     
     return model_ft
 
-def train_model(model, dataloaders, dataset_sizes, criterion, optimizer, scheduler, num_epochs=500):
+def train_model(output_dir, model, dataloaders, dataset_sizes, criterion, optimizer, scheduler, num_epochs):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
+    logger = Logger(os.path.join(output_dir, 'log_dir'))
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -133,22 +168,36 @@ def train_model(model, dataloaders, dataset_sizes, criterion, optimizer, schedul
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
+                
+            
+                    
+                    
             if phase == 'train':
                 scheduler.step()
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
 
+
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
-
+                
+            if phase =='train':
+                tag='train'
+            if phase == 'val':  
+                tag='val' 
+                
+            logger.scalar_summary(tag, epoch_loss, epoch)
+            
+            
+            
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
                 
                 # save the best model
-                PATH = './face_classifier.pth'
+                PATH = os.path.join(output_dir,'face_classifier.pth')
                 torch.save({
                         'epoch': epoch,
                         'model_state_dict': model.state_dict(),
@@ -156,7 +205,8 @@ def train_model(model, dataloaders, dataset_sizes, criterion, optimizer, schedul
                         'loss': epoch_loss,
                         'acc': epoch_acc
                         }, PATH)
-                
+            
+                  
 
         print()
 
@@ -168,7 +218,7 @@ def train_model(model, dataloaders, dataset_sizes, criterion, optimizer, schedul
     
 def evaluate_classification_err (model, checkpoint_path, dataloaders, dataset_sizes, criterion):
     
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     
     model.eval()
@@ -193,7 +243,6 @@ def evaluate_classification_err (model, checkpoint_path, dataloaders, dataset_si
             
         return avg_loss, avg_acc.item()
 
-    
     
 def visualize_model(model, dataloaders, num_images=6):
     was_training = model.training
@@ -223,7 +272,7 @@ def visualize_model(model, dataloaders, num_images=6):
         model.train(mode=was_training)
         
         
-def train(data_dir = '/volume3/AAM-GAN/data/RaFD'):
+def train(data_dir,output_dir, eval_type):
        
     
     model_ft = model()
@@ -237,23 +286,39 @@ def train(data_dir = '/volume3/AAM-GAN/data/RaFD'):
     # Decay LR by a factor of 0.1 every 7 epochs
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
     
-    dataloaders, class_names, dataset_sizes = get_loader(data_dir = data_dir)
-    train_model(model_ft, dataloaders, dataset_sizes, criterion, optimizer_ft, exp_lr_scheduler,
-                           num_epochs=500)
+    dataloaders, class_names, dataset_sizes = get_loader(data_dir, eval_type, 'train')
+    train_model(output_dir,model_ft, dataloaders, dataset_sizes, criterion, optimizer_ft, exp_lr_scheduler,num_epochs=15)
    
-def cls_err(data_dir='/volume3/AAM-GAN/stargan_rafd/results/output'):
+   
+def cls_err(data_dir, output_dir,eval_type):
     model_ft= model()
     model_ft = model_ft.to(device)
     criterion = nn.CrossEntropyLoss()
-    dataloaders, class_names, dataset_sizes = get_loader(data_dir = data_dir, mode='inference')
-    checkpoint = 'face_classifier.pth'
+    dataloaders, class_names, dataset_sizes = get_loader(data_dir=data_dir, eval_type= eval_type, mode='inference')
+    checkpoint = os.path.join(output_dir,'face_classifier.pth')
     err, acc = evaluate_classification_err(model_ft, checkpoint, dataloaders, dataset_sizes, criterion)
     print (err, acc)
- 
-# train the model                   
-# train()
 
-#find the classification err and accuracy
-cls_err('/volume3/AAM-GAN/stargan_rafd/results/output')
+
+parser = argparse.ArgumentParser()
+
+
+#required arguments
+parser.add_argument('--output_dir', type=str, default = './outputs/')
+parser.add_argument('--data_dir', type=str, default='/volume3/AAM-GAN/stargan_rafd/train_results')
+parser.add_argument('--mode', type=str, default = 'train', choices=['train','test'])
+parser.add_argument('--eval_type', type=str, default= 'gan_train', choices=['gan_train','gan_test'])
+config = parser.parse_args()
+    
+#visualize the data
+#visualize_save_image(data_dir = '/volume3/AAM-GAN/detected_faces' )
+
+if config.mode == 'train':
+    # train the model                   
+    train(config.data_dir, config.output_dir, config.eval_type)
+    
+if parser.mode =='test':
+    #find the classification err and accuracy
+    cls_err(config.data_dir, config.output_dir, config.eval_type)
 
     
