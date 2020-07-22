@@ -306,8 +306,8 @@ parser = argparse.ArgumentParser()
 #required arguments
 parser.add_argument('--output_dir', type=str, default = './outputs/')
 parser.add_argument('--data_dir', type=str, default='/volume3/AAM-GAN/stargan_rafd/train_results')
-parser.add_argument('--mode', type=str, default = 'train', choices=['train','test'])
-parser.add_argument('--eval_type', type=str, default= 'gan_train', choices=['gan_train','gan_test'])
+parser.add_argument('--mode', type=str, default = 'test', choices=['train','test'])
+parser.add_argument('--eval_type', type=str, default= 'gan_test', choices=['gan_train','gan_test'])
 config = parser.parse_args()
     
 #visualize the data
@@ -317,7 +317,7 @@ if config.mode == 'train':
     # train the model                   
     train(config.data_dir, config.output_dir, config.eval_type)
     
-if parser.mode =='test':
+if config.mode =='test':
     #find the classification err and accuracy
     cls_err(config.data_dir, config.output_dir, config.eval_type)
 
