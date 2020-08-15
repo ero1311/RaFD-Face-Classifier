@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, confusion_matrix,classification_report
 import torchvision
 from torchvision import datasets, models, transforms
 from torch.backends import cudnn
@@ -87,6 +89,7 @@ def get_loader(data_dir, eval_type='gan_train', mode = 'train'):
         image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x),
                                                   data_transforms[x])
                           for x in ['train', 'val']}
+        
         dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=32,
                                                      shuffle=True, num_workers=32)
                       for x in ['train', 'val']}
@@ -96,6 +99,7 @@ def get_loader(data_dir, eval_type='gan_train', mode = 'train'):
     else : 
     
         test_image_datasets = datasets.ImageFolder( data_dir,data_transforms['infer'])
+        print (test_image_datasets.classes)
         dataloaders = torch.utils.data.DataLoader(test_image_datasets, batch_size = 4, shuffle= False, num_workers = 4)
         dataset_sizes = len(test_image_datasets)
         class_names = test_image_datasets.classes
@@ -115,6 +119,67 @@ def visualize_save_image(data_dir):
     # Make a grid from batch
     out = torchvision.utils.make_grid(inputs)
     imsave(out,'img.png')
+    
+    
+#### function to plot confusion matrix
+
+def plot_confusion_matrix(y_true, y_pred, classes,
+                          normalize=False,
+                          title=None,
+                          cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    if not title:
+        if normalize:
+            title = 'Normalized confusion matrix'
+        else:
+            title = 'Confusion matrix, without normalization'
+
+    # Compute confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+    
+    #transpose the matrix to make x-axis True Class and Y-axis Predicted Class
+    cm= np.transpose(cm)
+    
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    #print(cm)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+    ax.figure.colorbar(im, ax=ax)
+    # We want to show all ticks...
+    ax.set(xticks=np.arange(cm.shape[0]),
+           yticks=np.arange(cm.shape[1]),
+           # ... and label them with the respective list entries
+           xticklabels=classes, yticklabels=classes,
+           
+           #here we are not printing the title
+           #title=title,
+           xlabel='True label',
+           ylabel='Predicted label')
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # Loop over data dimensions and create text annotations.
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            ax.text(j, i, format(cm[i, j], fmt),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
+    fig.tight_layout()
+    return fig,ax
+
 
 
 def model():
@@ -224,13 +289,20 @@ def evaluate_classification_err (model, checkpoint_path, dataloaders, dataset_si
     model.eval()
     running_loss = 0.0
     running_corrects = 0.0
+    label_list=[]
+    prediction_list = []
     with torch.no_grad():
         for i, (inputs, labels) in enumerate(dataloaders):
+            #print (i,labels)
             inputs = inputs.to(device)
             labels = labels.to(device)
+            label_list.extend(labels.tolist())
+            
 
             outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
+            prediction_list.extend(preds.tolist())
+            
             
             loss = criterion(outputs, labels)
             # statistics
@@ -241,7 +313,8 @@ def evaluate_classification_err (model, checkpoint_path, dataloaders, dataset_si
         avg_acc = running_corrects.double() / dataset_sizes
 
             
-        return avg_loss, avg_acc.item()
+        return avg_loss, avg_acc.item(), label_list, prediction_list
+
 
     
 def visualize_model(model, dataloaders, num_images=6):
@@ -253,6 +326,7 @@ def visualize_model(model, dataloaders, num_images=6):
     with torch.no_grad():
     
         for i, (inputs, labels) in enumerate(dataloaders['val']):
+            
             inputs = inputs.to(device)
             labels = labels.to(device)
 
@@ -296,8 +370,13 @@ def cls_err(data_dir, output_dir,eval_type):
     criterion = nn.CrossEntropyLoss()
     dataloaders, class_names, dataset_sizes = get_loader(data_dir=data_dir, eval_type= eval_type, mode='inference')
     checkpoint = os.path.join(output_dir,'face_classifier.pth')
-    err, acc = evaluate_classification_err(model_ft, checkpoint, dataloaders, dataset_sizes, criterion)
+    err, acc, label_list, prediction_list = evaluate_classification_err(model_ft, checkpoint, dataloaders, dataset_sizes, criterion)
     print (err, acc)
+    print (classification_report(label_list, prediction_list, target_names=class_names))
+    fig,ax= plot_confusion_matrix(label_list,prediction_list, class_names,title='Confusion Matrix')
+    plt.show()
+    filename = 'confusion.png'
+    fig.savefig(filename)
 
 
 parser = argparse.ArgumentParser()
