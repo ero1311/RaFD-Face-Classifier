@@ -18,6 +18,7 @@ face_classifier_face_aligned.pth
 AAM_GAN_train_log_dir
 baseline_train
 face_aligned_log
+data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

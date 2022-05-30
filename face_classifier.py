@@ -35,23 +35,17 @@ def get_loader(data_dir, eval_type='gan_train', mode = 'train'):
     if eval_type == 'gan_train':
         
         data_transforms = {
-            'train': transforms.Compose([
-                #transforms.CenterCrop(680),
-                transforms.Resize(128),         
+            'train': transforms.Compose([         
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ]),
             'val': transforms.Compose([
-                #transforms.CenterCrop(680),
-                transforms.Resize(128),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ]),
             
             'infer': transforms.Compose([
-                transforms.CenterCrop(680),
-                transforms.Resize(128),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
@@ -60,23 +54,17 @@ def get_loader(data_dir, eval_type='gan_train', mode = 'train'):
     if eval_type == 'gan_test':
     
         data_transforms = {
-            'train': transforms.Compose([
-                transforms.CenterCrop(680),
-                transforms.Resize(128),         
+            'train': transforms.Compose([        
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ]),
             'val': transforms.Compose([
-                transforms.CenterCrop(680),
-                transforms.Resize(128),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ]),
             
             'infer': transforms.Compose([
-                #transforms.CenterCrop(680),
-                transforms.Resize(128),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
@@ -185,7 +173,7 @@ def plot_confusion_matrix(y_true, y_pred, classes,
 def model():
     model_ft = models.resnet18(pretrained=True)
     num_ftrs = model_ft.fc.in_features    
-    model_ft.fc = nn.Linear(num_ftrs, 8)
+    model_ft.fc = nn.Linear(num_ftrs, 4)
     
     return model_ft
 
